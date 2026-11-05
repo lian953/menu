@@ -1,6 +1,6 @@
 /* Service worker: офлайн-режим для приложения «Меню и покупки» */
-const CACHE = 'menu-planner-v1';
-const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'menu-planner-v2';
+const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './fonts/montserrat-var.woff'];
 
 // Установка: кладём основные файлы в кэш
 self.addEventListener('install', e => {

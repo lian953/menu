@@ -11,12 +11,12 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 
-<!-- Шрифт: Montserrat (геометрический, как в тёмном референсе), есть кириллица -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Шрифт Montserrat лежит в папке fonts/ (не из интернета), поэтому текст выглядит одинаково и без сети -->
+<link rel="preload" href="fonts/montserrat-var.woff" as="font" type="font/woff" crossorigin>
 
 <style>
+/* Montserrat: переменный шрифт (толщина 100–900), кириллица + латиница. Лицензия OFL, см. fonts/OFL.txt */
+@font-face{font-family:'Montserrat';font-style:normal;font-weight:100 900;font-display:swap;src:url('fonts/montserrat-var.woff') format('woff')}
 /* =========================================================
    1. ПЕРЕМЕННЫЕ И ТЕМЫ
    ========================================================= */
@@ -407,7 +407,7 @@ textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
       </div>
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input class="inp" id="search" type="search" placeholder="Поиск по названию или ингредиенту">
+        <input class="inp" id="search" type="search" placeholder="Название или ингредиент">
       </div>
       <div id="recipeList"></div>
     </section>
