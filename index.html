@@ -280,6 +280,21 @@ select.inp option{color:#141614}
 #pasteBox{margin-bottom:12px}
 textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
 .item .x svg{width:17px;height:17px}
+/* Яблоки вместо эмодзи */
+:root[data-theme="dark"]{--tile:rgba(255,255,255,.12)}
+:root[data-theme="light"]{--tile:#F2F7E8}
+.ap{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.ap.ap-i{display:inline-block;width:1.3em;height:1.3em;vertical-align:-.32em;margin-right:.45em}
+.ap.ap-c{display:inline-block;width:15px;height:15px;vertical-align:-3px;margin-right:4px}
+.emoji{background:var(--tile);padding:7px}
+.entry .emoji,.pick .emoji{padding:5px}
+.logo{background:var(--tile);padding:4px}
+.meal-head .ico{width:32px;height:32px;display:block;flex:none}
+.empty .big{width:76px;height:76px;margin:0 auto 10px}
+.gi{width:22px;height:22px;flex:none;display:block}
+.li-ico{width:24px;height:24px;flex:none;display:block}
+.home-ico{width:30px;height:30px;flex:none}
+.emoji-row button{padding:5px}
 .item.have{opacity:.75}
 .home-ico{width:26px;text-align:center;font-size:18px;flex:none}
 .home-hint{margin:-2px 4px 10px}
@@ -385,7 +400,7 @@ textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
 <div id="app">
   <!-- Верхняя панель: логотип + переключатель темы -->
   <header class="topbar">
-    <div class="brand"><span class="logo">🌿</span>Меню</div>
+    <div class="brand"><span class="logo"><img class="ap" src="apples/a11.webp" alt="" draggable="false"></span>Меню</div>
     <div class="top-actions">
       <!-- Шестерёнка: данные и резервные копии (точка — пора сделать копию) -->
       <button class="icon-btn round" id="dataBtn" data-act="data" aria-label="Данные и копии">
@@ -433,7 +448,7 @@ textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
     <section class="screen" id="screen-shop">
       <h1>Список <em>покупок</em></h1>
       <p class="sub">Собирается из блюд, отмеченных в меню</p>
-      <button class="btn primary big" data-act="generate">✨ Сгенерировать список</button>
+      <button class="btn primary big" data-act="generate"><img class="ap ap-i" src="apples/a7.webp" alt="" draggable="false">Сгенерировать список</button>
       <!-- Блок бюджета: сумма списка + поле «Мой бюджет» -->
       <div class="hero budget" id="budgetBox" hidden>
         <div class="lbl" style="margin:0 0 6px">Итого:</div>
@@ -486,17 +501,23 @@ textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
    ========================================================= */
 const LS_KEY = 'menu-planner-v1';
 const CATS = ['Овощи/Фрукты','Мясо/Рыба','Молочка','Бакалея','Другое'];
-const CAT_ICON = {'Овощи/Фрукты':'🥕','Мясо/Рыба':'🥩','Молочка':'🥛','Бакалея':'🌾','Другое':'🧺'};
+const CAT_AP = {'Овощи/Фрукты':'a12','Мясо/Рыба':'a8','Молочка':'a3','Бакалея':'a10','Другое':'a5'};   // яблоко-значок категории
 const UNITS = ['г','кг','шт','мл','л'];
 const DAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const DAYS_FULL = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
 const MEALS = [
-  {id:'breakfast', name:'Завтрак', icon:'🌅'},
-  {id:'lunch',     name:'Обед',    icon:'🍲'},
-  {id:'dinner',    name:'Ужин',    icon:'🌙'},
-  {id:'snack',     name:'Перекус', icon:'🍎'}
+  {id:'breakfast', name:'Завтрак', icon:'a10'},
+  {id:'lunch',     name:'Обед',    icon:'a7'},
+  {id:'dinner',    name:'Ужин',    icon:'a1'},
+  {id:'snack',     name:'Перекус', icon:'a11'}
 ];
-const EMOJIS = ['🍲','🥗','🍳','🍝','🥘','🍕','🥞','🍜','🌯','🐟','🥔','🍰'];
+/* Вместо эмодзи — 12 яблок (папка apples/). Иконка рецепта хранится как id: a1…a12 */
+const APPLES = Array.from({length:12}, (_, i) => 'a' + (i + 1));
+const OLD_EMOJI = ['🍲','🥗','🍳','🍝','🥘','🍕','🥞','🍜','🌯','🐟','🥔','🍰'];   // прежний набор иконок: старые рецепты переедут на яблоки с тем же номером
+function appleId(e){ if(APPLES.includes(e)) return e; const i = OLD_EMOJI.indexOf(e); return APPLES[i >= 0 ? i : 11]; }
+/* Яблоко как картинка; cls — доп. класс (ap-i — в строке текста, ap-c — в плашке) */
+function ap(id, cls = ''){ return `<img class="ap ${cls}" src="apples/${appleId(id)}.webp" alt="" draggable="false">`; }
+const EMOJI_RE = /[\p{Extended_Pictographic}\uFE0F\u200D]/gu;   // на случай эмодзи в тексте уведомлений
 
 /* SVG-иконки */
 const I = {
@@ -624,10 +645,10 @@ async function saveBackup(){
     const shareable = (navigator.share && navigator.canShare) ? files.find(f => navigator.canShare({files:[f]})) : null;
     if(shareable) await navigator.share({files:[shareable], title:'Копия «Меню и покупки»'});
     else downloadFile(files[0]);
-    markBackup(); toast(shareable ? 'Копия отправлена 💾' : 'Копия сохранена в «Загрузки» 💾');
+    markBackup(); toast(shareable ? 'Копия отправлена' : 'Копия сохранена в «Загрузки»');
   }catch(e){
     if(e && e.name === 'AbortError') return;          // пользователь закрыл меню «Поделиться»
-    try{ downloadFile(files[0]); markBackup(); toast('Копия сохранена в «Загрузки» 💾'); }
+    try{ downloadFile(files[0]); markBackup(); toast('Копия сохранена в «Загрузки»'); }
     catch(_){ toast('Не удалось сохранить копию'); }
   }
 }
@@ -639,7 +660,7 @@ async function copyText(text){
   }catch(e){ return false; }
 }
 async function copyBackup(){
-  if(await copyText(JSON.stringify(backupObject()))){ markBackup(); toast('Скопировано. Вставьте в заметки или сообщение себе 📋'); }
+  if(await copyText(JSON.stringify(backupObject()))){ markBackup(); toast('Скопировано. Вставьте в заметки или сообщение себе'); }
   else toast('Не удалось скопировать, используйте «Сохранить копию»');
 }
 
@@ -656,7 +677,7 @@ function cleanRecipes(list){
   return (Array.isArray(list) ? list : []).filter(r => r && typeof r === 'object' && r.name && Array.isArray(r.ingredients)).map(r => {
     let id = String(r.id || uid()); while(seen.has(id)) id = uid(); seen.add(id);
     return {id, name:String(r.name).slice(0, 60), servings:Math.max(1, parseInt(r.servings) || 2),
-      emoji:String(r.emoji || '🍲').slice(0, 8),
+      emoji:appleId(r.emoji),
       ingredients: r.ingredients.filter(g => g && typeof g === 'object' && g.name).map(g => {
         const unit = UNITS.includes(g.unit) ? g.unit : 'г';
         return {name:String(g.name).slice(0, 50), qty:parseNum(g.qty), unit, cat: CATS.includes(g.cat) ? g.cat : 'Другое',
@@ -710,7 +731,7 @@ async function restoreFrom(text){
   const when = isNaN(dt) ? '' : ' (от ' + dt.toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'}) + ')';
   const ok = await confirmBox('Заменить данные?', `В копии: ${n} ${plural(n, 'рецепт', 'рецепта', 'рецептов')}${when}. Все текущие данные будут заменены.`, 'Заменить');
   if(!ok) return;
-  applyBackup(o); toast('Данные восстановлены ✅');
+  applyBackup(o); toast('Данные восстановлены');
 }
 
 /* Напоминание: точка на шестерёнке, если копии нет больше BACKUP_DAYS дней (и есть что терять) */
@@ -744,9 +765,9 @@ function openDataSheet(){
     <div class="data-status ${st.warn ? 'warn' : ''}" id="dataStatus">${esc(st.text)}</div>
     <p class="data-stats">Сейчас в приложении: ${r} ${plural(r, 'рецепт', 'рецепта', 'рецептов')}, ${dishes} ${plural(dishes, 'блюдо', 'блюда', 'блюд')} в меню, ${state.shop.items.length} в списке покупок.</p>
     <div class="data-actions">
-      <button class="btn primary wide" data-act="backup-save" type="button">💾 Сохранить копию</button>
-      <button class="btn wide" data-act="backup-load" type="button">📂 Загрузить копию</button>
-      <div class="two"><button class="btn" data-act="backup-copy" type="button">📋 Скопировать</button><button class="btn" data-act="paste-toggle" type="button">📥 Вставить</button></div>
+      <button class="btn primary wide" data-act="backup-save" type="button">${ap('a2', 'ap-i')}Сохранить копию</button>
+      <button class="btn wide" data-act="backup-load" type="button">${ap('a6', 'ap-i')}Загрузить копию</button>
+      <div class="two"><button class="btn" data-act="backup-copy" type="button">${ap('a9', 'ap-i')}Скопировать</button><button class="btn" data-act="paste-toggle" type="button">${ap('a4', 'ap-i')}Вставить</button></div>
     </div>
     <div id="pasteBox" hidden><textarea class="inp" id="pasteArea" rows="5" placeholder="Вставьте сюда скопированный текст копии"></textarea>
       <button class="btn primary wide" data-act="paste-restore" type="button" style="margin-top:10px">Восстановить из текста</button></div>
@@ -859,7 +880,7 @@ const plural = (n, a, b, c) => { n = Math.abs(n) % 100; const m = n % 10; return
 
 let toastTimer;
 function toast(msg){
-  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  const t = $('#toast'); t.innerHTML = ap(APPLES[Math.floor(Math.random() * APPLES.length)], 'ap-i') + esc(String(msg).replace(EMOJI_RE, '').trim()); t.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
 }
 const vibrate = () => { try{ navigator.vibrate && navigator.vibrate(10); }catch(e){} };
@@ -955,25 +976,25 @@ function renderRecipeList(){
   const list = state.recipes.filter(r => !q || r.name.toLowerCase().includes(q) || r.ingredients.some(i => i.name.toLowerCase().includes(q)));
   const box = $('#recipeList');
   if(!state.recipes.length){
-    box.innerHTML = `<div class="empty"><span class="big">🍳</span><p>Пока нет ни одного рецепта.<br>Добавьте первый или попробуйте примеры.</p>
+    box.innerHTML = `<div class="empty"><span class="big">${ap('a9')}</span><p>Пока нет ни одного рецепта.<br>Добавьте первый или попробуйте примеры.</p>
       <button class="btn" data-act="samples">Добавить примеры</button></div>`;
     return;
   }
-  if(!list.length){ box.innerHTML = `<div class="empty"><span class="big">🔍</span><p>Ничего не найдено</p></div>`; return; }
+  if(!list.length){ box.innerHTML = `<div class="empty"><span class="big">${ap('a4')}</span><p>Ничего не найдено</p></div>`; return; }
   box.innerHTML = list.map((r, i) => {
     const open = ui.openCard === r.id;
     const rc = recipeCost(r, r.servings);
     return `<article class="card recipe rise" style="--i:${i}">
       <div class="recipe-head" data-act="toggle-card" data-id="${r.id}">
-        <div class="emoji">${esc(r.emoji || '🍲')}</div>
+        <div class="emoji">${ap(r.emoji)}</div>
         <div class="grow"><h3>${esc(r.name)}</h3>
-          <div class="chips"><span class="chip">👥 ${r.servings}</span><span class="chip">${r.ingredients.length} ингр.</span>${rc.sum > 0 ? `<span class="chip">💰 ${money(rc.sum)}${rc.missing.length ? '+' : ''}</span>` : ''}</div></div>
+          <div class="chips"><span class="chip">${ap('a3', 'ap-c')}${r.servings}</span><span class="chip">${r.ingredients.length} ингр.</span>${rc.sum > 0 ? `<span class="chip">${ap('a7', 'ap-c')}${money(rc.sum)}${rc.missing.length ? '+' : ''}</span>` : ''}</div></div>
         <div class="actions">
           <button class="icon-btn" data-act="edit" data-id="${r.id}" aria-label="Редактировать">${I.edit}</button>
           <button class="icon-btn danger" data-act="del-recipe" data-id="${r.id}" aria-label="Удалить">${I.trash}</button>
         </div></div>
       ${open ? `<ul class="ing-list">${r.ingredients.length ? r.ingredients.map(g =>
-        `<li><span>${CAT_ICON[g.cat] || '🧺'}</span><span>${esc(g.name)}</span><b>${g.qty ? fmt(g.qty, g.unit) : ''}</b></li>`).join('') : '<li>Нет ингредиентов</li>'}</ul>` : ''}
+        `<li><span class="li-ico">${ap(CAT_AP[g.cat] || 'a5')}</span><span>${esc(g.name)}</span><b>${g.qty ? fmt(g.qty, g.unit) : ''}</b></li>`).join('') : '<li>Нет ингредиентов</li>'}</ul>` : ''}
     </article>`;
   }).join('');
 }
@@ -983,9 +1004,9 @@ function blankIng(){ return {name:'', qty:'', unit:'г', cat:'Овощи/Фру�
 function openRecipeForm(id){
   const r = id ? recipeById(id) : null;
   const draft = r ? {
-    id: r.id, name: r.name, servings: r.servings, emoji: r.emoji || '🍲',
+    id: r.id, name: r.name, servings: r.servings, emoji: appleId(r.emoji),
     ingredients: r.ingredients.map(g => ({name:g.name, qty: g.qty ? String(g.qty).replace('.', ',') : '', unit:g.unit, cat:g.cat, price: g.price ? String(g.price).replace('.', ',') : '', pu: g.pu || '', pack: g.pack ? String(g.pack).replace('.', ',') : '', _t:{unit:1, cat:1, price:g.price?1:0, pu:g.price?1:0, pack:g.price?1:0}}))
-  } : { id:null, name:'', servings:2, emoji:'🍲', ingredients:[blankIng()] };
+  } : { id:null, name:'', servings:2, emoji:'a12', ingredients:[blankIng()] };
   if(!draft.ingredients.length) draft.ingredients.push(blankIng());
   ctx = { type:'recipe', draft };
   refreshIngList();
@@ -997,12 +1018,12 @@ function openRecipeForm(id){
         <input id="fServ" data-f="servings" type="number" inputmode="numeric" min="1" value="${draft.servings}">
         <button data-act="f-step" data-d="1" type="button">+</button></div></div>
     <div class="field"><label>Ингредиенты</label>
-      <p class="hint">💡 Введите цену и выберите, за что она: за кг, 100 г, литр, штуку или пачку. Например: 500 г курицы, а кило стоит 300 — вводите 300 «за 1 кг», приложение само посчитает 150. Для пачки укажите, сколько в ней грамм (мл, штук).</p>
+      <p class="hint">Введите цену и выберите, за что она: за кг, 100 г, литр, штуку или пачку. Например: 500 г курицы, а кило стоит 300 — вводите 300 «за 1 кг», приложение само посчитает 150. Для пачки укажите, сколько в ней грамм (мл, штук).</p>
       <div id="ingRows">${ingRowsHTML(draft)}</div>
       <button class="btn wide" data-act="ing-add" type="button">+ Ингредиент</button></div>
     <div class="btns"><button class="btn" data-act="close" type="button">Отмена</button><button class="btn primary" data-act="save-recipe" type="button">Сохранить</button></div>`);
 }
-const emojiRowHTML = cur => EMOJIS.map(e => `<button type="button" class="${e === cur ? 'on' : ''}" data-act="emoji" data-e="${e}">${e}</button>`).join('');
+const emojiRowHTML = cur => APPLES.map(e => `<button type="button" class="${e === cur ? 'on' : ''}" data-act="emoji" data-e="${e}" aria-label="Иконка ${e.slice(1)}">${ap(e)}</button>`).join('');
 function ingRowsHTML(d){
   return d.ingredients.map((g, i) => `<div class="ing" data-i="${i}">
     <input class="inp" data-f="name" list="ingList" placeholder="Название (например, картофель)" value="${esc(g.name)}" maxlength="50">
@@ -1072,7 +1093,7 @@ function saveRecipe(){
   rememberIngredients(rec.ingredients);
   if(d.id){ const i = state.recipes.findIndex(r => r.id === d.id); state.recipes[i] = rec; }
   else state.recipes.unshift(rec);
-  save(); closeSheet(); renderScreen('recipes', false); toast(d.id ? 'Рецепт обновлён' : 'Рецепт добавлен 🎉');
+  save(); closeSheet(); renderScreen('recipes', false); toast(d.id ? 'Рецепт обновлён' : 'Рецепт добавлен');
 }
 async function deleteRecipe(id){
   const r = recipeById(id); if(!r) return;
@@ -1086,9 +1107,9 @@ function addSamples(){
   const mk = (name, emoji, servings, ings) => ({id:uid(), name, emoji, servings,
     ingredients: ings.map(([n,q,u,c,p]) => ({name:n, qty:q, unit:u, cat:c, price:p || 0, pu:'', pack:0}))});
   state.recipes.push(
-    mk('Куриный суп','🍲',4,[['Куриное филе',300,'г','Мясо/Рыба',350],['Картофель',400,'г','Овощи/Фрукты',50],['Морковь',1,'шт','Овощи/Фрукты',15],['Лук',1,'шт','Овощи/Фрукты',12],['Вермишель',80,'г','Бакалея',120]]),
-    mk('Салат с курицей','🥗',2,[['Куриное филе',200,'г','Мясо/Рыба',350],['Огурец',2,'шт','Овощи/Фрукты',30],['Помидор',2,'шт','Овощи/Фрукты',45],['Сметана',50,'г','Молочка',280]]),
-    mk('Омлет с сыром','🍳',2,[['Яйца',4,'шт','Молочка',12],['Молоко',100,'мл','Молочка',90],['Сыр',50,'г','Молочка',700],['Помидор',1,'шт','Овощи/Фрукты',45]])
+    mk('Куриный суп','a9',4,[['Куриное филе',300,'г','Мясо/Рыба',350],['Картофель',400,'г','Овощи/Фрукты',50],['Морковь',1,'шт','Овощи/Фрукты',15],['Лук',1,'шт','Овощи/Фрукты',12],['Вермишель',80,'г','Бакалея',120]]),
+    mk('Салат с курицей','a12',2,[['Куриное филе',200,'г','Мясо/Рыба',350],['Огурец',2,'шт','Овощи/Фрукты',30],['Помидор',2,'шт','Овощи/Фрукты',45],['Сметана',50,'г','Молочка',280]]),
+    mk('Омлет с сыром','a6',2,[['Яйца',4,'шт','Молочка',12],['Молоко',100,'мл','Молочка',90],['Сыр',50,'г','Молочка',700],['Помидор',1,'шт','Овощи/Фрукты',45]])
   );
   rememberIngredients(state.recipes.flatMap(r => r.ingredients));
   save(); renderScreen('recipes', true);
@@ -1112,7 +1133,7 @@ function renderDay(){
   const dc = planCost([d]);
   const box = $('#dayBody');
   if(!state.recipes.length){
-    box.innerHTML = `<div class="empty"><span class="big">📖</span><p>Сначала добавьте рецепты — из них собирается меню.</p><button class="btn primary" data-go="recipes">К рецептам</button></div>`;
+    box.innerHTML = `<div class="empty"><span class="big">${ap('a8')}</span><p>Сначала добавьте рецепты — из них собирается меню.</p><button class="btn primary" data-go="recipes">К рецептам</button></div>`;
     return;
   }
   box.innerHTML = `<div class="day-title"><div><h2>${DAYS_FULL[d]}${d === todayIdx() ? '<span class="tag">сегодня</span>' : ''}</h2>${dc.dishes ? `<div class="day-sum">Стоимость дня: ${money(dc.sum)}${dc.missing.size ? '+' : ''} ${CUR}</div>` : ''}</div>
@@ -1120,11 +1141,11 @@ function renderDay(){
   MEALS.map((m, mi) => {
     const entries = slot(d, m.id);
     return `<div class="card meal rise" style="--i:${mi}">
-      <div class="meal-head"><span class="ico">${m.icon}</span><h3>${m.name}</h3>
+      <div class="meal-head"><span class="ico">${ap(m.icon)}</span><h3>${m.name}</h3>
         <button class="icon-btn" data-act="open-picker" data-meal="${m.id}" aria-label="Добавить">${I.plus}</button></div>
       ${entries.length ? entries.map((e, idx) => {
         const r = recipeById(e.rid); if(!r) return ''; const rc = recipeCost(r, e.servings, true);
-        return `<div class="entry"><div class="emoji">${esc(r.emoji)}</div>
+        return `<div class="entry"><div class="emoji">${ap(r.emoji)}</div>
           <div class="name">${esc(r.name)}<small>в рецепте: ${r.servings}${rc.sum > 0 ? ` · ${money(rc.sum)}${rc.missing.length ? '+' : ''} ${CUR}` : ''}</small></div>
           <div class="stepper"><button data-act="srv" data-meal="${m.id}" data-idx="${idx}" data-d="-1">−</button><span>${e.servings}</span><button data-act="srv" data-meal="${m.id}" data-idx="${idx}" data-d="1">+</button></div>
           <button class="icon-btn danger" data-act="rm-entry" data-meal="${m.id}" data-idx="${idx}" aria-label="Убрать">×</button></div>`;
@@ -1136,9 +1157,9 @@ function openPicker(meal){
   const m = MEALS.find(x => x.id === meal);
   const cur = slot(state.activeDay, meal);
   ctx = { type:'picker', meal };
-  openSheet(`<div class="grab"></div><h2>${m.icon} ${m.name}</h2><p class="sub">${DAYS_FULL[state.activeDay]} · отметьте, что будете готовить</p>
+  openSheet(`<div class="grab"></div><h2>${ap(m.icon, 'ap-i')}${m.name}</h2><p class="sub">${DAYS_FULL[state.activeDay]} · отметьте, что будете готовить</p>
     <div class="pick-list">${state.recipes.map(r => `<div class="pick ${cur.some(e => e.rid === r.id) ? 'on' : ''}" data-act="pick" data-rid="${r.id}">
-      <div class="emoji">${esc(r.emoji)}</div><div class="grow"><b>${esc(r.name)}</b><small>${r.servings} ${plural(r.servings,'порция','порции','порций')}</small></div>
+      <div class="emoji">${ap(r.emoji)}</div><div class="grow"><b>${esc(r.name)}</b><small>${r.servings} ${plural(r.servings,'порция','порции','порций')}</small></div>
       <div class="check">${I.check}</div></div>`).join('')}</div>
     <button class="btn primary wide" data-act="close">Готово</button>`);
 }
@@ -1230,7 +1251,7 @@ function renderShop(){
   $('#shopActions').hidden = !all.length;
   updateBudget();
   if(!all.length){
-    box.innerHTML = `<div class="empty"><span class="big">🛒</span><p>Список пуст.<br>Отметьте блюда в меню и нажмите «Сгенерировать».</p></div>`;
+    box.innerHTML = `<div class="empty"><span class="big">${ap('a12')}</span><p>Список пуст.<br>Отметьте блюда в меню и нажмите «Сгенерировать».</p></div>`;
     return;
   }
   const done = items.filter(i => i.done).length;
@@ -1241,7 +1262,7 @@ function renderShop(){
   CATS.forEach(cat => {
     const list = items.filter(i => i.cat === cat);
     if(!list.length) return;
-    html += `<div class="group rise" style="--i:${++gi}"><div class="group-title"><span>${CAT_ICON[cat]}</span>${cat}<b>${list.filter(i => i.done).length}/${list.length}</b></div>` +
+    html += `<div class="group rise" style="--i:${++gi}"><div class="group-title"><span class="gi">${ap(CAT_AP[cat])}</span>${cat}<b>${list.filter(i => i.done).length}/${list.length}</b></div>` +
       list.map(it => `<div class="item ${it.done ? 'done' : ''}" data-act="toggle-item" data-key="${esc(it.key)}">
         <div class="check">${I.check}</div><div class="nm">${esc(it.name)}</div>
         ${it.qty ? `<div class="am">${fmt(it.qty, it.unit)}${it.cost > 0 ? `<small>${money(it.cost)} ${CUR}</small>` : (it.noPrice ? '<small class="np">нет цены</small>' : '')}</div>` : ''}
@@ -1250,10 +1271,10 @@ function renderShop(){
   });
   /* Продукты, которые уже есть дома: не входят в список и сумму, возвращаются нажатием */
   if(home.length){
-    html += `<div class="group home rise" style="--i:${++gi}"><div class="group-title"><span>🏠</span>Уже есть дома<b>${home.length}</b></div>
+    html += `<div class="group home rise" style="--i:${++gi}"><div class="group-title"><span class="gi">${ap('a2')}</span>Уже есть дома<b>${home.length}</b></div>
       <p class="hint home-hint">Эти продукты не входят в сумму. Нажмите на продукт, чтобы вернуть его в список.</p>` +
       home.map(it => `<div class="item have" data-act="have" data-key="${esc(it.key)}">
-        <div class="home-ico">🏠</div><div class="nm">${esc(it.name)}</div>
+        <div class="home-ico">${ap('a2')}</div><div class="nm">${esc(it.name)}</div>
         ${it.qty ? `<div class="am">${fmt(it.qty, it.unit)}</div>` : ''}</div>`).join('') + '</div>';
   }
   box.innerHTML = html;
@@ -1262,14 +1283,14 @@ function toggleItem(key){
   const it = state.shop.items.find(i => i.key === key); if(!it) return;
   it.done = !it.done; save(); vibrate();
   renderScreen('shop', false);
-  if(it.done && state.shop.items.filter(i => !i.have).every(i => i.done)){ confetti(); toast('Всё куплено! 🎉'); }
+  if(it.done && state.shop.items.filter(i => !i.have).every(i => i.done)){ confetti(); toast('Всё куплено!'); }
 }
 function shareText(){
-  let t = '🛒 Список покупок\n';
+  let t = '🍏 Список покупок\n';   // в текст для мессенджера картинку не вставить — там зелёное яблоко
   CATS.forEach(cat => {
     const list = state.shop.items.filter(i => i.cat === cat && !i.done && !i.have);
     if(!list.length) return;
-    t += `\n${CAT_ICON[cat]} ${cat}\n` + list.map(i => `• ${i.name}${i.qty ? ' — ' + fmt(i.qty, i.unit) : ''}`).join('\n') + '\n';
+    t += `\n🍏 ${cat}\n` + list.map(i => `• ${i.name}${i.qty ? ' — ' + fmt(i.qty, i.unit) : ''}`).join('\n') + '\n';
   });
   return t.trim();
 }
@@ -1277,7 +1298,7 @@ async function share(){
   const text = shareText();
   try{
     if(navigator.share){ await navigator.share({title:'Список покупок', text}); return; }
-    await navigator.clipboard.writeText(text); toast('Список скопирован 📋');
+    await navigator.clipboard.writeText(text); toast('Список скопирован');
   }catch(e){ if(e && e.name !== 'AbortError') toast('Не удалось поделиться'); }
 }
 
