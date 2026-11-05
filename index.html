@@ -519,7 +519,7 @@ function defaultState(){
     theme: matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark',
     screen: 'recipes',
     activeDay: todayIdx(),
-    recipes: [],            // {id,name,servings,time,emoji,ingredients:[{name,qty,unit,cat,price}]}
+    recipes: [],            // {id,name,servings,emoji,ingredients:[{name,qty,unit,cat,price,pu,pack}]}
     plan: {},               // plan[день][приём] = [{rid, servings}]
     budget: 0,              // бюджет, введённый пользователем
     pantry: {},             // продукты, которые уже есть дома: {название в нижнем регистре: true}
@@ -656,7 +656,7 @@ function cleanRecipes(list){
   return (Array.isArray(list) ? list : []).filter(r => r && typeof r === 'object' && r.name && Array.isArray(r.ingredients)).map(r => {
     let id = String(r.id || uid()); while(seen.has(id)) id = uid(); seen.add(id);
     return {id, name:String(r.name).slice(0, 60), servings:Math.max(1, parseInt(r.servings) || 2),
-      time: parseInt(r.time) > 0 ? String(parseInt(r.time)) : '', emoji:String(r.emoji || '🍲').slice(0, 8),
+      emoji:String(r.emoji || '🍲').slice(0, 8),
       ingredients: r.ingredients.filter(g => g && typeof g === 'object' && g.name).map(g => {
         const unit = UNITS.includes(g.unit) ? g.unit : 'г';
         return {name:String(g.name).slice(0, 50), qty:parseNum(g.qty), unit, cat: CATS.includes(g.cat) ? g.cat : 'Другое',
@@ -967,7 +967,7 @@ function renderRecipeList(){
       <div class="recipe-head" data-act="toggle-card" data-id="${r.id}">
         <div class="emoji">${esc(r.emoji || '🍲')}</div>
         <div class="grow"><h3>${esc(r.name)}</h3>
-          <div class="chips"><span class="chip">👥 ${r.servings}</span>${r.time ? `<span class="chip">⏱ ${esc(r.time)} мин</span>` : ''}<span class="chip">${r.ingredients.length} ингр.</span>${rc.sum > 0 ? `<span class="chip">💰 ${money(rc.sum)}${rc.missing.length ? '+' : ''}</span>` : ''}</div></div>
+          <div class="chips"><span class="chip">👥 ${r.servings}</span><span class="chip">${r.ingredients.length} ингр.</span>${rc.sum > 0 ? `<span class="chip">💰 ${money(rc.sum)}${rc.missing.length ? '+' : ''}</span>` : ''}</div></div>
         <div class="actions">
           <button class="icon-btn" data-act="edit" data-id="${r.id}" aria-label="Редактировать">${I.edit}</button>
           <button class="icon-btn danger" data-act="del-recipe" data-id="${r.id}" aria-label="Удалить">${I.trash}</button>
@@ -983,22 +983,19 @@ function blankIng(){ return {name:'', qty:'', unit:'г', cat:'Овощи/Фру�
 function openRecipeForm(id){
   const r = id ? recipeById(id) : null;
   const draft = r ? {
-    id: r.id, name: r.name, servings: r.servings, time: r.time || '', emoji: r.emoji || '🍲',
+    id: r.id, name: r.name, servings: r.servings, emoji: r.emoji || '🍲',
     ingredients: r.ingredients.map(g => ({name:g.name, qty: g.qty ? String(g.qty).replace('.', ',') : '', unit:g.unit, cat:g.cat, price: g.price ? String(g.price).replace('.', ',') : '', pu: g.pu || '', pack: g.pack ? String(g.pack).replace('.', ',') : '', _t:{unit:1, cat:1, price:g.price?1:0, pu:g.price?1:0, pack:g.price?1:0}}))
-  } : { id:null, name:'', servings:2, time:'', emoji:'🍲', ingredients:[blankIng()] };
+  } : { id:null, name:'', servings:2, emoji:'🍲', ingredients:[blankIng()] };
   if(!draft.ingredients.length) draft.ingredients.push(blankIng());
   ctx = { type:'recipe', draft };
   refreshIngList();
   openSheet(`<div class="grab"></div><h2>${r ? 'Редактировать рецепт' : 'Новый рецепт'}</h2>
     <div class="field"><label>Иконка</label><div class="emoji-row" id="emojiRow">${emojiRowHTML(draft.emoji)}</div></div>
     <div class="field"><label>Название</label><input class="inp" id="fName" data-f="name" placeholder="Например, куриный суп" value="${esc(draft.name)}" maxlength="60"></div>
-    <div class="two">
-      <div class="field"><label>Порций</label><div class="step-inp">
+    <div class="field"><label>Порций</label><div class="step-inp">
         <button data-act="f-step" data-d="-1" type="button">−</button>
         <input id="fServ" data-f="servings" type="number" inputmode="numeric" min="1" value="${draft.servings}">
         <button data-act="f-step" data-d="1" type="button">+</button></div></div>
-      <div class="field"><label>Время, мин</label><input class="inp" data-f="time" type="number" inputmode="numeric" min="0" placeholder="30" value="${esc(draft.time)}"></div>
-    </div>
     <div class="field"><label>Ингредиенты</label>
       <p class="hint">💡 Введите цену и выберите, за что она: за кг, 100 г, литр, штуку или пачку. Например: 500 г курицы, а кило стоит 300 — вводите 300 «за 1 кг», приложение само посчитает 150. Для пачки укажите, сколько в ней грамм (мл, штук).</p>
       <div id="ingRows">${ingRowsHTML(draft)}</div>
@@ -1069,7 +1066,6 @@ function saveRecipe(){
   const rec = {
     id: d.id || uid(), name,
     servings: Math.max(1, parseInt(d.servings) || 2),
-    time: parseInt(d.time) > 0 ? String(parseInt(d.time)) : '',
     emoji: d.emoji,
     ingredients: d.ingredients.map(g => ({name:String(g.name).trim(), qty:parseNum(g.qty), unit:g.unit, cat:g.cat, price:parseNum(g.price), pu:puOf(g), pack:parseNum(g.pack)})).filter(g => g.name)
   };
@@ -1087,12 +1083,12 @@ async function deleteRecipe(id){
   save(); renderScreen('recipes', false); toast('Рецепт удалён');
 }
 function addSamples(){
-  const mk = (name, emoji, servings, time, ings) => ({id:uid(), name, emoji, servings, time:String(time),
+  const mk = (name, emoji, servings, ings) => ({id:uid(), name, emoji, servings,
     ingredients: ings.map(([n,q,u,c,p]) => ({name:n, qty:q, unit:u, cat:c, price:p || 0, pu:'', pack:0}))});
   state.recipes.push(
-    mk('Куриный суп','🍲',4,45,[['Куриное филе',300,'г','Мясо/Рыба',350],['Картофель',400,'г','Овощи/Фрукты',50],['Морковь',1,'шт','Овощи/Фрукты',15],['Лук',1,'шт','Овощи/Фрукты',12],['Вермишель',80,'г','Бакалея',120]]),
-    mk('Салат с курицей','🥗',2,20,[['Куриное филе',200,'г','Мясо/Рыба',350],['Огурец',2,'шт','Овощи/Фрукты',30],['Помидор',2,'шт','Овощи/Фрукты',45],['Сметана',50,'г','Молочка',280]]),
-    mk('Омлет с сыром','🍳',2,10,[['Яйца',4,'шт','Молочка',12],['Молоко',100,'мл','Молочка',90],['Сыр',50,'г','Молочка',700],['Помидор',1,'шт','Овощи/Фрукты',45]])
+    mk('Куриный суп','🍲',4,[['Куриное филе',300,'г','Мясо/Рыба',350],['Картофель',400,'г','Овощи/Фрукты',50],['Морковь',1,'шт','Овощи/Фрукты',15],['Лук',1,'шт','Овощи/Фрукты',12],['Вермишель',80,'г','Бакалея',120]]),
+    mk('Салат с курицей','🥗',2,[['Куриное филе',200,'г','Мясо/Рыба',350],['Огурец',2,'шт','Овощи/Фрукты',30],['Помидор',2,'шт','Овощи/Фрукты',45],['Сметана',50,'г','Молочка',280]]),
+    mk('Омлет с сыром','🍳',2,[['Яйца',4,'шт','Молочка',12],['Молоко',100,'мл','Молочка',90],['Сыр',50,'г','Молочка',700],['Помидор',1,'шт','Овощи/Фрукты',45]])
   );
   rememberIngredients(state.recipes.flatMap(r => r.ingredients));
   save(); renderScreen('recipes', true);
