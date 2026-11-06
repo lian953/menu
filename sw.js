@@ -1,6 +1,6 @@
 /* Service worker: офлайн-режим для приложения «Меню и покупки» */
-const CACHE = 'menu-planner-v3';
-const APPLES = Array.from({length:12}, (_, i) => `./apples/a${i + 1}.webp`);   // картинки-яблоки вместо эмодзи
+const CACHE = 'menu-planner-v4';
+const APPLES = Array.from({length:12}, (_, i) => `./apples/a${i + 1}.svg`);   // картинки-яблоки вместо эмодзи
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './fonts/montserrat-var.woff', ...APPLES];
 
 // Установка: кладём основные файлы в кэш

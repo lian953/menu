@@ -290,7 +290,8 @@ textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
 .entry .emoji,.pick .emoji{padding:5px}
 .logo{background:var(--tile);padding:4px}
 .meal-head .ico{width:32px;height:32px;display:block;flex:none}
-.empty .big{width:76px;height:76px;margin:0 auto 10px}
+.empty .big{width:132px;height:132px;margin:0 auto 6px;animation:none}
+.apple3d{width:100%;height:100%;display:block}
 .gi{width:22px;height:22px;flex:none;display:block}
 .li-ico{width:24px;height:24px;flex:none;display:block}
 .home-ico{width:30px;height:30px;flex:none}
@@ -400,7 +401,7 @@ textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
 <div id="app">
   <!-- Верхняя панель: логотип + переключатель темы -->
   <header class="topbar">
-    <div class="brand"><span class="logo"><img class="ap" src="apples/a11.webp" alt="" draggable="false"></span>Меню</div>
+    <div class="brand"><span class="logo"><img class="ap" src="apples/a11.svg" alt="" draggable="false"></span>Меню</div>
     <div class="top-actions">
       <!-- Шестерёнка: данные и резервные копии (точка — пора сделать копию) -->
       <button class="icon-btn round" id="dataBtn" data-act="data" aria-label="Данные и копии">
@@ -448,7 +449,7 @@ textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
     <section class="screen" id="screen-shop">
       <h1>Список <em>покупок</em></h1>
       <p class="sub">Собирается из блюд, отмеченных в меню</p>
-      <button class="btn primary big" data-act="generate"><img class="ap ap-i" src="apples/a7.webp" alt="" draggable="false">Сгенерировать список</button>
+      <button class="btn primary big" data-act="generate"><img class="ap ap-i" src="apples/a7.svg" alt="" draggable="false">Сгенерировать список</button>
       <!-- Блок бюджета: сумма списка + поле «Мой бюджет» -->
       <div class="hero budget" id="budgetBox" hidden>
         <div class="lbl" style="margin:0 0 6px">Итого:</div>
@@ -493,6 +494,186 @@ textarea.inp{resize:vertical;font-size:13px;font-family:inherit}
 <datalist id="ingList"></datalist>
 
 <script>
+/* ===== 3D-яблоко: собственный WebGL без библиотек =====
+   Один общий WebGL-контекст рисует кадр для каждого <canvas class="apple3d"> (копирует через drawImage).
+   Если WebGL недоступен — показываем плоскую SVG-картинку (data-fb). */
+const Apple3D = (() => {
+  const VS = `attribute vec3 p;attribute vec3 n;uniform mat4 M;uniform float asp;varying vec3 vn,vp,vo;
+  void main(){vec4 w=M*vec4(p,1.);vn=mat3(M)*n;vp=w.xyz;vo=p;
+  float z=4.2-w.z;gl_Position=vec4(w.x*2.6/z/asp,w.y*2.6/z,-w.z*.1,1.);}`;
+  const FS = `precision mediump float;varying vec3 vn,vp,vo;
+  uniform vec3 c0,c1,c2;uniform float gloss,speck,alpha,glass;
+  float h(vec3 q){return fract(sin(dot(q,vec3(12.9,78.2,37.7)))*43758.5);}
+  float win(vec3 r,vec3 d,float w,float hh){ // «окно» софтбокса в отражении
+    float a=dot(normalize(r.xz),normalize(d.xz));float e=r.y-d.y;
+    return smoothstep(w,w*.6,abs(acos(clamp(a,-1.,1.)))) * smoothstep(hh,hh*.5,abs(e)); }
+  void main(){
+    vec3 N=normalize(vn);vec3 V=vec3(0.,0.,1.);if(!gl_FrontFacing)N=-N;
+    float ndv=clamp(dot(N,V),0.,1.);
+    vec3 L=normalize(vec3(-.5,.75,.7));
+    float dif=max(dot(N,L),0.)*.62+.5;
+    float t=clamp(vo.y*.5+.5,0.,1.);                       // низ → верх
+    vec3 base=mix(c0,c1,smoothstep(.0,.8,1.-t*.6-dot(N,vec3(-.3,.4,.6))*.3));
+    base=mix(base,c2,pow(1.-ndv,2.2)*.7);                  // тёмный край
+    base+=speck*step(.985,h(floor(vo*60.)))*vec3(.35,.35,.1);
+    vec3 col=base*dif;
+    vec3 R=reflect(-V,N);
+    float sp=pow(max(dot(R,normalize(L+V)*2.-V),0.),1.)*0.;
+    float hl=pow(max(dot(N,normalize(L+V)),0.),70.)*gloss*.35;
+    float box=win(R,vec3(-.62,.25,.8),.3,.5)*gloss*.7;    // окно-отражение
+    float rim=pow(1.-ndv,3.)*.35;
+    col+=hl+box+vec3(rim)*c0*.6;
+    col+=pow(max(dot(N,vec3(.4,-.8,.3)),0.),3.)*.18*c0;    // отражённый свет снизу
+    float a=1.;
+    if(glass>.5){a=.16+pow(1.-ndv,2.)*.55+hl*.8+box*.7;col=vec3(.7,.95,.9)*dif*.42+hl+box+rim;}
+    gl_FragColor=vec4(col*a,a);}`;
+  const VARS = [
+    {c0:[.55,.82,.28],c1:[.86,.95,.45],c2:[.12,.36,.14],gloss:1,speck:1},      // гренни
+    {c0:[.55,.82,.45],c1:[.78,.92,.6],c2:[.1,.38,.3],gloss:1,speck:0,glass:1}, // стекло
+    {c0:[.1,.5,.2],c1:[.3,.72,.28],c2:[.04,.22,.1],gloss:1.1,speck:0},         // тёмно-зелёное
+    {c0:[.85,.85,.2],c1:[.98,.97,.52],c2:[.45,.5,.08],gloss:1,speck:1}         // золотое
+  ];
+  let gl, prog, loc, bufs, ok = null;
+  const items = new Set();
+  function m4(ay, ax, s) { // вращение вокруг Y, наклон X, масштаб
+    const cy = Math.cos(ay), sy = Math.sin(ay), cx = Math.cos(ax), sx = Math.sin(ax);
+    // M = Rx * Ry * s (по столбцам)
+    return new Float32Array([
+      s*cy, s*sx*sy, -s*cx*sy, 0,
+      0, s*cx, s*sx, 0,
+      s*sy, -s*sx*cy, s*cx*cy, 0,
+      0, 0, 0, 1]);
+  }
+  // сетка вращения профиля: r=sin t·(1+k cos t)·W, y=cos t·H, ямки сверху и снизу
+  function lathe(N, M, W, H, k, dT, sT, dB, sB) {
+    const pos = [], nor = [], idx = [];
+    const prof = [];
+    for (let i = 0; i <= N; i++) {
+      const t = Math.PI * i / N, s = Math.sin(t), c = Math.cos(t);
+      const r = s * (1 + k * c) * W; let y = c * H;
+      if (c > 0) y -= dT * Math.exp(-((r / sT) ** 2)); else y += dB * Math.exp(-((r / sB) ** 2));
+      prof.push([r, y]);
+    }
+    for (let i = 0; i <= N; i++) {
+      const a = prof[Math.max(i - 1, 0)], b = prof[Math.min(i + 1, N)];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+      let nr = ty, ny = -tx; // нормаль наружу
+      if (i === 0) { nr = 0; ny = 1; } if (i === N) { nr = 0; ny = -1; }
+      for (let j = 0; j <= M; j++) {
+        const f = 2 * Math.PI * j / M, cf = Math.cos(f), sf = Math.sin(f);
+        pos.push(prof[i][0] * cf, prof[i][1], prof[i][0] * sf);
+        nor.push(nr * cf, ny, nr * sf);
+      }
+    }
+    for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) {
+      const a = i * (M + 1) + j, b = a + M + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+    return { pos, nor, idx, top: prof[0][1] };
+  }
+  function tube(x0, y0, x1, y1, r, seg) { // изогнутый черенок
+    const pos = [], nor = [], idx = [], S = 8;
+    for (let i = 0; i <= seg; i++) {
+      const u = i / seg, x = x0 + (x1 - x0) * u * u, y = y0 + (y1 - y0) * u, rr = r * (1 + .25 * (1 - u) + (u > .92 ? .15 : 0));
+      for (let j = 0; j <= S; j++) {
+        const f = 2 * Math.PI * j / S;
+        pos.push(x + Math.cos(f) * rr, y, Math.sin(f) * rr); nor.push(Math.cos(f), 0, Math.sin(f));
+      }
+    }
+    for (let i = 0; i < seg; i++) for (let j = 0; j < S; j++) { const a = i * (S + 1) + j, b = a + S + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    return { pos, nor, idx };
+  }
+  function leafMesh(x, y) { // листик: изогнутая пластина
+    const pos = [], nor = [], idx = [], A = 14, B = 6;
+    for (let i = 0; i <= A; i++) for (let j = 0; j <= B; j++) {
+      const u = i / A, v = j / B - .5, w = Math.sin(Math.PI * Math.pow(u, .8)) * .16 * (1 - Math.abs(v) * .2);
+      const lx = x + u * .62, ly = y + .06 + Math.sin(u * 2.4) * .12 - u * u * .1, lz = v * 2 * w + .0;
+      pos.push(lx, ly - Math.abs(v) * .05, lz); nor.push(0, 1, 0);
+    }
+    for (let i = 0; i < A; i++) for (let j = 0; j < B; j++) { const a = i * (B + 1) + j, b = a + B + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    return { pos, nor, idx };
+  }
+  function mk(g) {
+    const vb = gl.createBuffer(), nb = gl.createBuffer(), ib = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(g.pos), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(g.nor), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(g.idx), gl.STATIC_DRAW);
+    return { vb, nb, ib, n: g.idx.length };
+  }
+  function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+  function init() {
+    if (ok !== null) return ok;
+    try {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 264;
+      gl = cv.getContext('webgl', { premultipliedAlpha: true, alpha: true, antialias: true });
+      if (!gl) throw 0;
+      prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw 0;
+      gl.useProgram(prog);
+      loc = {}; ['M', 'asp', 'c0', 'c1', 'c2', 'gloss', 'speck', 'alpha', 'glass'].forEach(k => loc[k] = gl.getUniformLocation(prog, k));
+      loc.p = gl.getAttribLocation(prog, 'p'); loc.n = gl.getAttribLocation(prog, 'n');
+      const body = lathe(72, 96, 1, 0.92, .05, .2, .34, .07, .25);
+      const core = lathe(60, 72, .8, .74, .05, .16, .28, .05, .2);
+      bufs = {
+        body: mk(body), core: mk(core),
+        stem: mk(tube(0, body.top - .02, .1, body.top + .33, .045, 8)),
+        leaf: mk(leafMesh(.04, body.top + .22))
+      };
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.enable(gl.DEPTH_TEST); gl.clearColor(0, 0, 0, 0);
+      ok = true;
+    } catch (e) { ok = false; }
+    return ok;
+  }
+  function draw(b, mat, M, extra) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, b.vb); gl.enableVertexAttribArray(loc.p); gl.vertexAttribPointer(loc.p, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, b.nb); gl.enableVertexAttribArray(loc.n); gl.vertexAttribPointer(loc.n, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.ib);
+    gl.uniformMatrix4fv(loc.M, false, M);
+    gl.uniform3fv(loc.c0, mat.c0); gl.uniform3fv(loc.c1, mat.c1); gl.uniform3fv(loc.c2, mat.c2);
+    gl.uniform1f(loc.gloss, mat.gloss || 0); gl.uniform1f(loc.speck, mat.speck || 0); gl.uniform1f(loc.glass, mat.glass || 0);
+    gl.drawElements(gl.TRIANGLES, b.n, gl.UNSIGNED_SHORT, 0);
+  }
+  const STEM = { c0: [.38, .24, .12], c1: [.5, .34, .18], c2: [.15, .08, .04], gloss: .2 };
+  const LEAF = { c0: [.2, .5, .15], c1: [.4, .72, .25], c2: [.08, .26, .08], gloss: .6 };
+  function frame(el, t) {
+    const v = VARS[(+el.dataset.v || 0) % VARS.length], W = el.width, Hh = el.height;
+    if (gl.canvas.width !== W) { gl.canvas.width = W; gl.canvas.height = Hh; }
+    gl.viewport(0, 0, W, Hh); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.uniform1f(loc.asp, 1);
+    const ay = t * .0009 + (+el.dataset.v || 0) * 1.3, M = m4(ay, .22, .95);
+    gl.depthMask(true);
+    if (v.glass) {
+      draw(bufs.core, { c0: [.45, .78, .3], c1: [.75, .93, .45], c2: [.1, .34, .14], gloss: 1, speck: 0 }, m4(ay, .22, .95), 0);
+      draw(bufs.stem, STEM, M); draw(bufs.leaf, LEAF, M);
+      gl.depthMask(false); draw(bufs.body, v, M); gl.depthMask(true);
+    } else { draw(bufs.body, v, M); draw(bufs.stem, STEM, M); draw(bufs.leaf, LEAF, M); }
+    const ctx = el.getContext('2d'); ctx.clearRect(0, 0, W, Hh); ctx.drawImage(gl.canvas, 0, 0);
+  }
+  let raf = 0, reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function loop(t) {
+    raf = 0;
+    items.forEach(el => { if (!el.isConnected) { items.delete(el); return; } const r = el.getBoundingClientRect(); if (r.bottom > 0 && r.top < innerHeight && r.width) frame(el, t); });
+    if (items.size && !document.hidden && !reduce) raf = requestAnimationFrame(loop);
+  }
+  function hydrate(root) {
+    (root || document).querySelectorAll('canvas.apple3d:not([data-h])').forEach(el => {
+      el.dataset.h = 1;
+      if (!init()) { // запасной вариант: плоская картинка
+        el.replaceWith(Object.assign(document.createElement('img'), { src: `apples/${el.dataset.fb || 'a1'}.svg`, className: 'ap', alt: '', draggable: false }));
+        return;
+      }
+      items.add(el); frame(el, 3000);
+    });
+    if (items.size && !raf) raf = requestAnimationFrame(loop);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && items.size && !raf) raf = requestAnimationFrame(loop); });
+  new MutationObserver(() => hydrate()).observe(document.documentElement, { childList: true, subtree: true });
+  return { hydrate, html: (v, fb) => `<canvas class="apple3d" data-v="${v}" data-fb="${fb}" width="264" height="264"></canvas>` };
+})();
+
+</script>
+<script>
 (() => {
 'use strict';
 
@@ -516,7 +697,7 @@ const APPLES = Array.from({length:12}, (_, i) => 'a' + (i + 1));
 const OLD_EMOJI = ['🍲','🥗','🍳','🍝','🥘','🍕','🥞','🍜','🌯','🐟','🥔','🍰'];   // прежний набор иконок: старые рецепты переедут на яблоки с тем же номером
 function appleId(e){ if(APPLES.includes(e)) return e; const i = OLD_EMOJI.indexOf(e); return APPLES[i >= 0 ? i : 11]; }
 /* Яблоко как картинка; cls — доп. класс (ap-i — в строке текста, ap-c — в плашке) */
-function ap(id, cls = ''){ return `<img class="ap ${cls}" src="apples/${appleId(id)}.webp" alt="" draggable="false">`; }
+function ap(id, cls = ''){ return `<img class="ap ${cls}" src="apples/${appleId(id)}.svg" alt="" draggable="false">`; }
 const EMOJI_RE = /[\p{Extended_Pictographic}\uFE0F\u200D]/gu;   // на случай эмодзи в тексте уведомлений
 
 /* SVG-иконки */
@@ -976,11 +1157,11 @@ function renderRecipeList(){
   const list = state.recipes.filter(r => !q || r.name.toLowerCase().includes(q) || r.ingredients.some(i => i.name.toLowerCase().includes(q)));
   const box = $('#recipeList');
   if(!state.recipes.length){
-    box.innerHTML = `<div class="empty"><span class="big">${ap('a9')}</span><p>Пока нет ни одного рецепта.<br>Добавьте первый или попробуйте примеры.</p>
+    box.innerHTML = `<div class="empty"><span class="big">${Apple3D.html(0,'a9')}</span><p>Пока нет ни одного рецепта.<br>Добавьте первый или попробуйте примеры.</p>
       <button class="btn" data-act="samples">Добавить примеры</button></div>`;
     return;
   }
-  if(!list.length){ box.innerHTML = `<div class="empty"><span class="big">${ap('a4')}</span><p>Ничего не найдено</p></div>`; return; }
+  if(!list.length){ box.innerHTML = `<div class="empty"><span class="big">${Apple3D.html(1,'a4')}</span><p>Ничего не найдено</p></div>`; return; }
   box.innerHTML = list.map((r, i) => {
     const open = ui.openCard === r.id;
     const rc = recipeCost(r, r.servings);
@@ -1133,7 +1314,7 @@ function renderDay(){
   const dc = planCost([d]);
   const box = $('#dayBody');
   if(!state.recipes.length){
-    box.innerHTML = `<div class="empty"><span class="big">${ap('a8')}</span><p>Сначала добавьте рецепты — из них собирается меню.</p><button class="btn primary" data-go="recipes">К рецептам</button></div>`;
+    box.innerHTML = `<div class="empty"><span class="big">${Apple3D.html(2,'a8')}</span><p>Сначала добавьте рецепты — из них собирается меню.</p><button class="btn primary" data-go="recipes">К рецептам</button></div>`;
     return;
   }
   box.innerHTML = `<div class="day-title"><div><h2>${DAYS_FULL[d]}${d === todayIdx() ? '<span class="tag">сегодня</span>' : ''}</h2>${dc.dishes ? `<div class="day-sum">Стоимость дня: ${money(dc.sum)}${dc.missing.size ? '+' : ''} ${CUR}</div>` : ''}</div>
@@ -1251,7 +1432,7 @@ function renderShop(){
   $('#shopActions').hidden = !all.length;
   updateBudget();
   if(!all.length){
-    box.innerHTML = `<div class="empty"><span class="big">${ap('a12')}</span><p>Список пуст.<br>Отметьте блюда в меню и нажмите «Сгенерировать».</p></div>`;
+    box.innerHTML = `<div class="empty"><span class="big">${Apple3D.html(3,'a12')}</span><p>Список пуст.<br>Отметьте блюда в меню и нажмите «Сгенерировать».</p></div>`;
     return;
   }
   const done = items.filter(i => i.done).length;
